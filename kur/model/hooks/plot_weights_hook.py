@@ -46,12 +46,14 @@ class PlotWeightsHook(TrainingHook):
 		return 'plot_weights'
 
 	###########################################################################
-	def __init__(self, plot_directory, weight_file, with_weights, plot_every_n_epochs, *args, **kwargs):
+	def __init__(self, layer_names=None, plot_directory=None, weight_file=None, with_weights=None, plot_every_n_epochs=None, *args, **kwargs):
 		""" Creates a new plot hook for plotting weights of layers
 		"""
 
 		super().__init__(*args, **kwargs)
 
+		# added self.layer_names
+		self.layer_names = layer_names
 		self.directory = plot_directory
 		if not os.path.exists(self.directory):
 			os.makedirs(self.directory)
@@ -83,9 +85,6 @@ class PlotWeightsHook(TrainingHook):
 		"""
 
 		from matplotlib import pyplot as plt	# pylint: disable=import-error
-
-
-
 		if status not in (
 			# the plotting is allowed only at end of epoch
 			TrainingHook.EPOCH_END,
@@ -93,11 +92,33 @@ class PlotWeightsHook(TrainingHook):
 
 			return
 
-
 		weight_path = None
 		tempdir = tempfile.mkdtemp()
 		weight_path = os.path.join(tempdir, 'current_epoch_model')
 		model.save(weight_path)
+
+
+		def plot_conv_layer(layer_out, layer_name):
+
+			values = layer_out
+		    # In my experiment example, this layer dim (1, 31, 31, 64)
+			num_filters = values.shape[3]
+
+			num_grids = math.ceil(math.sqrt(num_filters))
+			fig, axes = plt.subplots(num_grids, num_grids)
+
+			for i, ax in enumerate(axes.flat):
+				if i<num_filters:
+
+					img = values[0, :, :, i]
+					ax.imshow(img, interpolation='nearest', cmap='binary')
+
+		        # Remove ticks from the plot.
+				ax.set_xticks([])
+				ax.set_yticks([])
+
+			plt.savefig('{}/{}_epoch_{}.png'.format(self.directory, layer_name, info['epoch']))
+
 
 		def plot_weights(kernel_filename):
 
@@ -214,3 +235,19 @@ class PlotWeightsHook(TrainingHook):
 
 						if weight_keywords[0].find("dense") > -1 or weight_keywords[1].find("dense") > -1:
 							plot_weights(this_file)
+
+			# if layer_names are not given, then don't plot layers
+			if self.layer_names is None:
+				return
+
+			for layer_name in self.layer_names:
+				# e.g., a layer's output shape is (32, 31, 31, 64)
+				# [0] is to take a single image sample
+				output = info['inter_layers_outputs'][layer_name][0]
+
+				# make sure img_dim is (1, w, h, num_filters), here (1, 31, 31, 64)
+				img_dim = (1,) + output.shape
+
+				output_reshape = output.reshape(img_dim)
+
+				plot_conv_layer(output_reshape, layer_name)

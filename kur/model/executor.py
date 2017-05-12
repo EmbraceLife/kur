@@ -461,7 +461,8 @@ class Executor:
 			info = {
 				'epoch' : epoch+1,
 				'total_epochs' : epochs,
-				'Training loss' : cur_train_loss
+				'Training loss' : cur_train_loss,
+				'inter_layers_outputs': prediction
 			}
 			if validation is not None:
 				info['Validation loss'] = validation_loss
