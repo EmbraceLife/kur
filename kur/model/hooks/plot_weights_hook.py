@@ -46,7 +46,7 @@ class PlotWeightsHook(TrainingHook):
 		return 'plot_weights'
 
 	###########################################################################
-	def __init__(self, layer_names=None, plot_directory=None, weight_file=None, with_weights=None, plot_every_n_epochs=None, *args, **kwargs):
+	def __init__(self, layer_names=None, plot_directory=None, weight_file=None, with_weights=None, plot_every_n_epochs=None, animate_layers=None, *args, **kwargs):
 		""" Creates a new plot hook for plotting weights of layers
 		"""
 
@@ -113,6 +113,8 @@ class PlotWeightsHook(TrainingHook):
 					img = values[0, :, :, i]
 					ax.imshow(img, interpolation='nearest', cmap='binary') # binary, seismic
 
+				if i == 0:
+					ax.set_title("layer_shape: {}".format(values.shape))
 		        # Remove ticks from the plot.
 				ax.set_xticks([])
 				ax.set_yticks([])
@@ -179,6 +181,7 @@ class PlotWeightsHook(TrainingHook):
 			num_grids = math.ceil(math.sqrt(num_filters))
 
 			fig, axes = plt.subplots(num_grids, num_grids)
+
 			for i, ax in enumerate(axes.flat):
 				if i<num_filters:
 
@@ -186,7 +189,7 @@ class PlotWeightsHook(TrainingHook):
 					ax.imshow(img, vmin=w_min, vmax=w_max, interpolation='nearest', cmap='seismic')
 
 				if i == 0:
-					ax.set_title("validation_loss: {}".format(round(info['Validation loss'][None]['labels'], 3)))
+					ax.set_title("validation_loss: {}\nweight_shape ({})".format(round(info['Validation loss'][None]['labels'], 3), w.shape))
 
 				ax.set_xticks([])
 				ax.set_yticks([])
@@ -219,7 +222,7 @@ class PlotWeightsHook(TrainingHook):
 				self.weight_file = weight_path
 
 			for dirpath, _, filenames in os.walk(self.weight_file):
-				set_trace()
+
 				for this_file in filenames:
 					valid_weights_filenames.append(dirpath+"/"+this_file)
 
