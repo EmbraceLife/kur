@@ -111,7 +111,7 @@ class PlotWeightsHook(TrainingHook):
 				if i<num_filters:
 
 					img = values[0, :, :, i]
-					ax.imshow(img, interpolation='nearest', cmap='binary')
+					ax.imshow(img, interpolation='nearest', cmap='binary') # binary, seismic
 
 		        # Remove ticks from the plot.
 				ax.set_xticks([])
@@ -219,6 +219,7 @@ class PlotWeightsHook(TrainingHook):
 				self.weight_file = weight_path
 
 			for dirpath, _, filenames in os.walk(self.weight_file):
+				set_trace()
 				for this_file in filenames:
 					valid_weights_filenames.append(dirpath+"/"+this_file)
 
@@ -241,11 +242,11 @@ class PlotWeightsHook(TrainingHook):
 				return
 
 			for layer_name in self.layer_names:
-				# e.g., a layer's output shape is (32, 31, 31, 64)
-				# [0] is to take a single image sample
+
 				output = info['inter_layers_outputs'][layer_name][0]
 
 				# make sure img_dim is (1, w, h, num_filters), here (1, 31, 31, 64)
+				# plot 3 supposedly color channel of input image
 				img_dim = (1,) + output.shape
 
 				output_reshape = output.reshape(img_dim)

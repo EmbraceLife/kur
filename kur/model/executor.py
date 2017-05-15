@@ -775,8 +775,10 @@ class Executor:
 
 					timers['batch'].resume()
 					try:
+						# take all specified layers outputs
 						prediction, batch_loss = train_func(
 							model=self.model, data=batch)
+
 					except RetryException:
 						continue
 					finally:
