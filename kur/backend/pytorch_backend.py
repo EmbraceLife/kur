@@ -370,12 +370,24 @@ class PyTorchBackend(Backend):
 			'model' : model.data
 		})
 
+		print("at pytorch_backend.py, search summary\n\n")
+		# print model summary without -vv
+		x = io.StringIO()
+		# print out model summary|structure
+		self.summary(model, x)
+		for line in x.getvalue().split('\n'):
+			print(line)
+
+		# keep print summary in debug mode avaliable too, to avoid conflict
 		if logger.isEnabledFor(logging.DEBUG):
 			x = io.StringIO()
 			# print out model summary|structure
 			self.summary(model, x)
 			for line in x.getvalue().split('\n'):
 				logger.debug(line)
+
+
+
 
 		if not assemble_only:
 			model.compiled[key] = result
@@ -422,7 +434,6 @@ class PyTorchBackend(Backend):
 	def summary(self, model, file=None):
 		""" Prints a model summary
 		"""
-		set_trace()
 		file = file or sys.stdout
 		fill = lambda x, w: x[:min(w, len(x))].ljust(w)
 		num_param = 0
@@ -433,7 +444,8 @@ class PyTorchBackend(Backend):
 			fill('Parameters', 10)
 		), file=file)
 		print('{}-+-{}-+-{}'.format('-'*30, '-'*20, '-'*10), file=file)
-		# access weights name and weights values from pytorch model 
+		# access weights name and weights values from pytorch model
+		# pytorch_backend print out weights, biases of each layer not layers themselves
 		for k, v in model.data.model.state_dict().items():
 			print('{} | {} | {}'.format(
 				fill(k, 30),

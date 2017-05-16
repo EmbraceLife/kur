@@ -1,3 +1,8 @@
+################################
+# prepare examine tools
+from pdb import set_trace
+from pprint import pprint
+from inspect import getdoc, getmembers, getsourcelines, getmodule, getfullargspec, getargvalues
 """
 Copyright 2016 Deepgram
 
@@ -572,14 +577,26 @@ class KerasBackend(Backend):
 
 		if 'raw' not in model.compiled:
 			logger.trace('Instantiating a Keras model.')
+			# compiled is keras.engine.training.Model object or model.compiled['raw']
 			compiled = self.make_model(
 				inputs=[node.value for node in model.inputs.values()],
 				outputs=[node.value for node in model.outputs.values()]
 			)
 
+			# print summary (layers and its shape instead of weights of hidden layers), without debug mode
+			print("at keras_backend.py, search summary\n\n")
+			x = io.StringIO()
+			with contextlib.redirect_stdout(x):
+				# compiled.summary() print out all layers and its shapes
+				compiled.summary()
+			for line in x.getvalue().split('\n'):
+				print(line)
+
+			# keep print summary in debug mode avaliable too, to avoid conflict
 			if logger.isEnabledFor(logging.DEBUG):
 				x = io.StringIO()
 				with contextlib.redirect_stdout(x):
+					# compiled.summary() print out all layers and its shapes
 					compiled.summary()
 				for line in x.getvalue().split('\n'):
 					logger.debug(line)
