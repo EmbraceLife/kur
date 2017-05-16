@@ -1,3 +1,8 @@
+################################
+# prepare examine tools
+from pdb import set_trace
+from pprint import pprint
+from inspect import getdoc, getmembers, getsourcelines, getmodule, getfullargspec, getargvalues
 """
 Copyright 2017 Deepgram
 
@@ -367,6 +372,7 @@ class PyTorchBackend(Backend):
 
 		if logger.isEnabledFor(logging.DEBUG):
 			x = io.StringIO()
+			# print out model summary|structure
 			self.summary(model, x)
 			for line in x.getvalue().split('\n'):
 				logger.debug(line)
@@ -416,6 +422,7 @@ class PyTorchBackend(Backend):
 	def summary(self, model, file=None):
 		""" Prints a model summary
 		"""
+		set_trace()
 		file = file or sys.stdout
 		fill = lambda x, w: x[:min(w, len(x))].ljust(w)
 		num_param = 0
