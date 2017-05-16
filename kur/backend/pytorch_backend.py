@@ -433,6 +433,7 @@ class PyTorchBackend(Backend):
 			fill('Parameters', 10)
 		), file=file)
 		print('{}-+-{}-+-{}'.format('-'*30, '-'*20, '-'*10), file=file)
+		# access weights name and weights values from pytorch model 
 		for k, v in model.data.model.state_dict().items():
 			print('{} | {} | {}'.format(
 				fill(k, 30),
