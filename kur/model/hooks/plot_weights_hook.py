@@ -1,3 +1,8 @@
+################################
+# prepare examine tools
+from pdb import set_trace
+from pprint import pprint
+from inspect import getdoc, getmembers, getsourcelines, getmodule, getfullargspec, getargvalues
 """
 Copyright 2017 Deepgram
 
@@ -97,7 +102,7 @@ class PlotWeightsHook(TrainingHook):
 		weight_path = os.path.join(tempdir, 'current_epoch_model')
 		model.save(weight_path)
 
-
+		# only plot conv layers (lots of squared images)
 		def plot_conv_layer(layer_out, layer_name):
 
 			values = layer_out
@@ -105,7 +110,11 @@ class PlotWeightsHook(TrainingHook):
 			num_filters = values.shape[3]
 
 			num_grids = math.ceil(math.sqrt(num_filters))
+
 			fig, axes = plt.subplots(num_grids, num_grids)
+			fig.suptitle(layer_name+", shape:"+str(values.shape), fontsize="x-large")
+			# global title
+			# fig.suptitle(layer_name+", shape:"+str(values.shape), fontsize="x-large")
 
 			for i, ax in enumerate(axes.flat):
 				if i<num_filters:
@@ -113,59 +122,85 @@ class PlotWeightsHook(TrainingHook):
 					img = values[0, :, :, i]
 					ax.imshow(img, interpolation='nearest', cmap='binary') # binary, seismic
 
-				if i == 0:
-					ax.set_title("layer_shape: {}".format(values.shape))
-		        # Remove ticks from the plot.
+
+		        # # Remove ticks from the plot.
 				ax.set_xticks([])
 				ax.set_yticks([])
+
+			fig.savefig('{}/{}_epoch_{}.png'.format(self.directory, layer_name, info['epoch']))
+			# so that previous plots won't affect later plot
+			plt.clf()
+
+		# plot layers with 2-d or 1-d, what about layers with uneven 3-d
+		def plot_uneven_layer(layer_out, layer_name):
+
+			w = layer_out
+
+			w_plot = None
+			if len(w.shape)==2 and max(w.shape)>20 :
+				s1, s2 = w.shape
+				if s1 < s2:
+					w_plot = w[:, :20]
+				else:
+					w_plot = w[:20, :]
+			elif len(w.shape)==2 and max(w.shape)<=20:
+				w_plot = w
+
+			elif len(w.shape) == 1 and w.shape[0]>20:
+				# reshape to 2-d, as plt.imshow only work on 2-d
+				w_plot = w.reshape(1,-1)[1,:20]
+
+			elif len(w.shape) == 1 and w.shape[0]<=20:
+				w_plot = w.reshape(1,-1)
+
+			elif len(w.shape) > 2:
+				logger.error("w.shape length >=3, need extra code to handle it")
+
+			# set_trace()
+			plt.imshow(w_plot, interpolation='nearest', cmap='bone', origin='lower')
+
+			# set the size of color bar
+			plt.colorbar(shrink=.72)
+			plt.suptitle("{}_layer, shape: {}".format(layer_name, w.shape), fontsize="x-large")
+			plt.xticks(())
+			plt.yticks(())
+
 
 			plt.savefig('{}/{}_epoch_{}.png'.format(self.directory, layer_name, info['epoch']))
+			# so that previous plots won't affect later plot
+			plt.clf()
 
-
-		def plot_weights(kernel_filename):
-
-			filename_cut_dir = kernel_filename[kernel_filename.find("dense") :]
+			   							# keywords of weights
+			# only plot 1-d, 2-d, what about 3-d uneven weights
+		def plot_uneven_weights(kernel_filename, weights_keywords):
 
 			w = idx.load(kernel_filename)
+			if len(w.shape)==2 and max(w.shape)>20 :
+				s1, s2 = w.shape
+				if s1 < s2:
+					w_plot = w[:, :20]
+				else:
+					w_plot = w[:20, :]
 
-			w_min = np.min(w)
-			w_max = np.max(w)
+			elif len(w.shape) == 1 and w.shape[0]>20:
+				w_plot = w[:20]
+			else:
+				logger.warning("w.shape length is not 1 nor 2")
+
+			plt.imshow(w_plot, interpolation='nearest', cmap='bone', origin='lower')
+
+			# set the size of color bar
+			plt.colorbar(shrink=.72)
+			plt.suptitle("{}_weights, 1st 20 out of shape: {}".format(weights_keywords, w.shape), fontsize="x-large")
+			plt.xticks(())
+			plt.yticks(())
 
 
-			s1, s2 = w.shape
-			if s1 < s2:
-				w = w.reshape((s2, s1))
+			filename_cut_dir = kernel_filename[kernel_filename.find(weights_keywords) :]
 
-			flattend_pixels, num_classes = w.shape
-			num_grids = math.ceil(math.sqrt(num_classes))
-			width_pixels = math.ceil(math.sqrt(flattend_pixels))
-
-			fig, axes = plt.subplots(num_grids, num_grids)
-			fig.subplots_adjust(hspace=0.3, wspace=0.3)
-
-			for i, ax in enumerate(axes.flat):
-				if i<num_classes:
-
-					try:
-						image = w[:, i].reshape((width_pixels, width_pixels))
-					except ValueError:
-						logger.error("\nweights ({}), its first dim must be a square of an positive integer, but current weights first dim is {}. So no plotting for this weights.\n\n".format(filename_cut_dir, w.shape[0]))
-						return
-
-					ax.set_xlabel("W_column: {0}".format(i))
-					ax.imshow(image, vmin=w_min, vmax=w_max, cmap='seismic')
-
-				if i == 0:
-					ax.set_title("validation_loss: {}".format(round(info['Validation loss'][None]['labels'], 3)))
-
-				# Remove ticks from each sub-plot.
-				ax.set_xticks([])
-				ax.set_yticks([])
-
-			# either display or save the plot
-			# plt.show()
 			plt.savefig('{}/{}_epoch_{}.png'.format(self.directory, filename_cut_dir, info['epoch']))
-
+			# so that previous plots won't affect later plot
+			plt.clf()
 
 		def plot_conv_weights(kernel_filename, input_channel=0):
 			w = idx.load(kernel_filename)
@@ -181,37 +216,24 @@ class PlotWeightsHook(TrainingHook):
 			num_grids = math.ceil(math.sqrt(num_filters))
 
 			fig, axes = plt.subplots(num_grids, num_grids)
-
+			fig.suptitle("Conv_weights, shape:"+str(w.shape), fontsize="x-large")
 			for i, ax in enumerate(axes.flat):
 				if i<num_filters:
 
 					img = w[:, :, input_channel, i]
 					ax.imshow(img, vmin=w_min, vmax=w_max, interpolation='nearest', cmap='seismic')
 
-				if i == 0:
-					ax.set_title("validation_loss: {}\nweight_shape ({})".format(round(info['Validation loss'][None]['labels'], 3), w.shape))
+				# if i == 0:
+				# 	ax.set_title("loss: {}\nshape ({}), conv_weight".format(round(info['Validation loss'][None]['labels'], 3), w.shape))
 
 				ax.set_xticks([])
 				ax.set_yticks([])
 
 			filename_cut_dir = kernel_filename[kernel_filename.find("convol") :]
 
-			plt.savefig('{}/{}_epoch_{}.png'.format(self.directory, filename_cut_dir, info['epoch']))
-
-
-		def plot_rnn_weights(kernel_filename):
-
-			w = idx.load(kernel_filename)
-
-			w_min = np.min(w)
-			w_max = np.max(w)
-			plt.imshow(w, vmin=w_min, vmax=w_max, cmap='seismic')
-			plt.title("validation_loss: {}".format(round(info['Validation loss'][None]['out_char'], 3)))
-
-			filename_cut_dir = kernel_filename[kernel_filename.find("recurrent") :]
-
-			plt.savefig('{}/{}_epoch_{}.png'.format(self.directory, filename_cut_dir, info['epoch']))
-
+			fig.savefig('{}/{}_epoch_{}.png'.format(self.directory, filename_cut_dir, info['epoch']))
+			# so that previous plots won't affect later plot
+			plt.clf()
 
 
 		if info['epoch'] == 1 or info['epoch'] % self.plot_every_n_epochs == 0:
@@ -232,26 +254,39 @@ class PlotWeightsHook(TrainingHook):
 					if this_file.find(weight_keywords[0]) > -1 and this_file.find(weight_keywords[1]) > -1:
 
 						if weight_keywords[0].find("recurrent") > -1 or weight_keywords[1].find("recurrent") > -1:
-							plot_rnn_weights(this_file)
+							weight_keywords = "recurrent"
+							plot_uneven_weights(this_file, weight_keywords)
 
 						if weight_keywords[0].find("convol") > -1 or weight_keywords[1].find("convol") > -1:
 							plot_conv_weights(this_file)
 
 						if weight_keywords[0].find("dense") > -1 or weight_keywords[1].find("dense") > -1:
-							plot_weights(this_file)
+							weight_keywords = "dense"
+							plot_uneven_weights(this_file, weight_keywords)
 
 			# if layer_names are not given, then don't plot layers
 			if self.layer_names is None:
 				return
 
 			for layer_name in self.layer_names:
+				# take only one sample to plot
+				layer_out = info['inter_layers_outputs'][layer_name]
 
-				output = info['inter_layers_outputs'][layer_name][0]
+				# to plot 3-d or more dim layers
+				if len(layer_out.shape) > 2:
 
-				# make sure img_dim is (1, w, h, num_filters), here (1, 31, 31, 64)
-				# plot 3 supposedly color channel of input image
-				img_dim = (1,) + output.shape
+					output = layer_out[0]
 
-				output_reshape = output.reshape(img_dim)
+					# make sure img_dim is (1, w, h, num_filters), here (1, 31, 31, 64)
+					# plot 3 supposedly color channel of input image
+					img_dim = (1,) + output.shape
 
-				plot_conv_layer(output_reshape, layer_name)
+					output_reshape = output.reshape(img_dim)
+
+					plot_conv_layer(output_reshape, layer_name)
+
+				# plot only 2 dim layer or vector layer
+				else:
+
+					output = layer_out[0]
+					plot_uneven_layer(output, layer_name)
