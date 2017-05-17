@@ -475,19 +475,32 @@ class PyTorchBackend(Backend):
 			single, global loss value can be returned instead.
 		"""
 		set_trace()
+		# from kur.model object to pytorch model object
 		torch_model = model.compiled['train']['model']
+		# access loss torch placeholder func and categorical_crossentropy func and which layer to calc loss
 		loss = model.compiled['train']['loss']
+		# access torch adam optimizer object
+		# torch optimizer object contains lots of data values inside
+		# deserve more attention dig
 		optimizer = model.compiled['train']['optimizer']
+		# access kur adam optimizer object
 		kur_optimizer = model.compiled['train']['kur_optimizer']
 
+		# if pytorch optimizer is available:
 		if optimizer:
+			# Clears the gradients of all optimized :class:`Variable` s
 			optimizer.zero_grad()
 
+		# Performs a forward pass and calculates loss
+		# data: dict. A dictionary whose keys are the names of the model layers, and whose respective values are numpy arrays contain
+ '        those values for the batch.
 		predictions, losses = torch_model.test(data, loss)
 
 		if optimizer:
+			# Runs the backward pass on the network
 			torch_model.backprop(losses)
 
+			# set clip_type to pytorch optimizer
 			if kur_optimizer.clip_type:
 				torch_model.clip_gradients(
 					kur_optimizer.clip_type,
@@ -509,14 +522,18 @@ class PyTorchBackend(Backend):
 						'but no such data column was found: %s. Ignoring '
 						'this.', kur_optimizer.scale_rate)
 			if not step_done:
+				# Performs a single optimization step in pytorch
 				optimizer.step()
 
-		metrics = {
+		metrics =
+			# take loss name, and loss value (scalar array)
 			k : L.data.cpu().numpy().squeeze(-1)
 			for k, L in zip(loss, losses)
 		}
 
+		#
 		predictions = {
+			# take all selected layers names and layer outputs values 
 			k : v.data.cpu().numpy() for k, v in zip(model.outputs, predictions)
 		}
 
