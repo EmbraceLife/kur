@@ -3,6 +3,7 @@
 from pdb import set_trace
 from pprint import pprint
 from inspect import getdoc, getmembers, getsourcelines, getmodule, getfullargspec, getargvalues
+
 """
 Copyright 2017 Deepgram
 
@@ -100,6 +101,7 @@ class PlotWeightsHook(TrainingHook):
 		weight_path = None
 		tempdir = tempfile.mkdtemp()
 		weight_path = os.path.join(tempdir, 'current_epoch_model')
+		# given model, we can save weights of all layers
 		model.save(weight_path)
 
 		# only plot conv layers (lots of squared images)
@@ -156,7 +158,6 @@ class PlotWeightsHook(TrainingHook):
 			elif len(w.shape) > 2:
 				logger.error("w.shape length >=3, need extra code to handle it")
 
-			# set_trace()
 			plt.imshow(w_plot, interpolation='nearest', cmap='bone', origin='lower')
 
 			# set the size of color bar

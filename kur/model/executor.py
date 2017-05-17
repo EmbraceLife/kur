@@ -302,6 +302,7 @@ class Executor:
 			if last_weights is not None:
 				logger.info('Saving most recent weights: %s', last_weights)
 				with CriticalSection():
+					# given model, we can save weights of all layers
 					self.model.save(last_weights)
 			if log is not None:
 				log.flush()
@@ -401,6 +402,7 @@ class Executor:
 			if saved_recent is None:
 				logger.trace('Saving weights to: %s', target)
 				with CriticalSection():
+					# given model, we can save weights of all layers
 					self.model.save(target)
 				saved_recent = target
 			elif not os.path.exists(saved_recent):
