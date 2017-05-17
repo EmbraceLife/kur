@@ -721,6 +721,7 @@ class Executor:
 		last_checkpoint = session.copy()
 
 		epoch = completed_epochs - 1
+		# from train_func() try backend.train() for 3 times if something is wrong
 		train_func = self.retry(
 			self.model.backend.train,
 			self.auto_retry
@@ -777,7 +778,7 @@ class Executor:
 
 					timers['batch'].resume()
 					try:
-						# take all specified layers outputs
+						# return all specified layers values and loss using train_func for every batch
 						prediction, batch_loss = train_func(
 							model=self.model, data=batch)
 

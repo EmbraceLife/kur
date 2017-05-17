@@ -457,6 +457,7 @@ class PyTorchBackend(Backend):
 		print('Total parameters: {}'.format(num_param), file=file)
 
 	###########################################################################
+	# if backend set to pytorch, then flow from backend.train() to pytorch_backend.train()
 	def train(self, model, data):
 		""" Fits the given model on a batch of data.
 
@@ -473,7 +474,7 @@ class PyTorchBackend(Backend):
 			respective outputs. If per-output loss is not available, then a
 			single, global loss value can be returned instead.
 		"""
-
+		set_trace()
 		torch_model = model.compiled['train']['model']
 		loss = model.compiled['train']['loss']
 		optimizer = model.compiled['train']['optimizer']
