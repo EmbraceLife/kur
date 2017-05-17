@@ -754,41 +754,48 @@ class KerasBackend(Backend):
 
 	###########################################################################
 	def run_batch(self, model, batch, key, is_train):
+
 		if model.compiled is None or key not in model.compiled:
 			raise ValueError('A model has not been compiled to: {}'
 				.format(key))
-
+		# access model.compiled['train'] and ['raw']
 		compiled = model.compiled[key]
 		raw = model.compiled['raw']
 
 		assert isinstance(is_train, bool)
-
+		# expand data dim for one more dimension at last
 		def coerce_shape(data, shape, name):
 			if data.ndim < len(shape):
 				return numpy.expand_dims(data, -1)
 			else:
 				return data
-
+		# prepare inputs for training to predicitons and loss
 		inputs = [
 			coerce_shape(
 				batch[model.get_data_name_by_layer_name(batch, name)],
 				shape, name
 			)
+			# access all shapes of the seleted layers
+			# access all names of the selected layers
 			for shape, name in zip(
 				compiled['shapes']['input'],
 				compiled['names']['input']
 			)
 		] + [is_train]
-
+		# use model.compiled['train']['func'] with inputs to get predictions and loss
 		outputs = compiled['func'](inputs)
 		num_outputs = len(raw.outputs)
 		metrics = {
 			k : v for k, v in zip(
+				# access name for loss
 				compiled['names']['output'][num_outputs:],
+				# access loss value
 				outputs[num_outputs:]
 			)
 		}
 		predictions = {
+			# access all names of selected layers
+			# access all values of selected layers
 			name : data for name, data in zip(
 				model.outputs, outputs[:num_outputs]
 			)
@@ -800,7 +807,9 @@ class KerasBackend(Backend):
 	def train(self, model, data):
 		""" Fits the given model on a batch of data.
 		"""
+		# access kur's optimizer
 		kur_optimizer = model.compiled['train']['kur_optimizer']
+		# scale_rate of kur optimizer can complicate the process of calculatign prediction and loss
 		if kur_optimizer.scale_rate:
 			if kur_optimizer.scale_rate in data:
 				import keras.backend as K		# pylint: disable=import-error
@@ -820,6 +829,8 @@ class KerasBackend(Backend):
 				logger.warning('The optimizer "scale_rate" was specified, but '
 					'no such data column was found: %s. Ignoring this.',
 					kur_optimizer.scale_rate)
+
+		# if scale_rate is not available, prediction and loss are straightforward using run_batch()
 		return self.run_batch(model, data, 'train', True)
 
 	###########################################################################

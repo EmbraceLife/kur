@@ -491,8 +491,7 @@ class PyTorchBackend(Backend):
 			optimizer.zero_grad()
 
 		# Performs a forward pass and calculates loss
-		# data: dict. A dictionary whose keys are the names of the model layers, and whose respective values are numpy arrays contain
- '        those values for the batch.
+		# data: dict. A dictionary whose keys are the names of the model layers, and whose respective values are numpy arrays contain those values for the batch.
 		predictions, losses = torch_model.test(data, loss)
 
 		if optimizer:
@@ -524,7 +523,7 @@ class PyTorchBackend(Backend):
 				# Performs a single optimization step in pytorch
 				optimizer.step()
 
-		metrics =
+		metrics = {
 			# take loss name, and loss value (scalar array)
 			k : L.data.cpu().numpy().squeeze(-1)
 			for k, L in zip(loss, losses)
