@@ -474,7 +474,6 @@ class PyTorchBackend(Backend):
 			respective outputs. If per-output loss is not available, then a
 			single, global loss value can be returned instead.
 		"""
-		set_trace()
 		# from kur.model object to pytorch model object
 		torch_model = model.compiled['train']['model']
 		# access loss torch placeholder func and categorical_crossentropy func and which layer to calc loss
@@ -531,9 +530,8 @@ class PyTorchBackend(Backend):
 			for k, L in zip(loss, losses)
 		}
 
-		#
 		predictions = {
-			# take all selected layers names and layer outputs values 
+			# take all selected layers names and layer outputs values
 			k : v.data.cpu().numpy() for k, v in zip(model.outputs, predictions)
 		}
 
