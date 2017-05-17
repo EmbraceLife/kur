@@ -783,6 +783,7 @@ class KerasBackend(Backend):
 			)
 		] + [is_train]
 		# use model.compiled['train']['func'] with inputs to get predictions and loss
+		# in keras (tf and th) all layers together as a model is used at once, not use layer individually
 		outputs = compiled['func'](inputs)
 		num_outputs = len(raw.outputs)
 		metrics = {
