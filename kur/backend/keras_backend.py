@@ -779,6 +779,7 @@ class KerasBackend(Backend):
 		return predictions, metrics
 
 	###########################################################################
+	# if backend set to keras, then flow from backend.train() to keras_backend.train()
 	def train(self, model, data):
 		""" Fits the given model on a batch of data.
 		"""

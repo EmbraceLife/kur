@@ -515,6 +515,8 @@ class Backend:
 		raise NotImplementedError
 
 	###########################################################################
+	# with model and batch data to access layer outputs and loss for every batch of data
+	# from backend.train() to access keras_backend.train() and pytorch_backend.train()
 	def train(self, model, data):
 		""" Fits the given model on a batch of data.
 
