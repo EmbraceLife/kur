@@ -325,6 +325,7 @@ class KerasBackend(Backend):
 	###########################################################################
 	def _save_keras(self, keras_model, filename):
 		""" Saves a native Keras model.
+			args: keras_model, folder_name (save weights files)
 		"""
 		path = os.path.expanduser(os.path.expandvars(filename))
 		if os.path.exists(path):
@@ -411,10 +412,12 @@ class KerasBackend(Backend):
 			raise ValueError('Target weight directory does not exist: {}'
 				.format(path))
 
+		# access keras_model's flattened_layers or just layers objects
 		layers = keras_model.flattened_layers \
 			if hasattr(keras_model, 'flattened_layers') else keras_model.layers
 
 		# Get a map from "layer name" to "layer instance" in the current model.
+		# create a dict: each element: layer_name: keras_layer object
 		index = {}
 		for layer in layers:
 			if layer.name:
@@ -423,11 +426,16 @@ class KerasBackend(Backend):
 		# Enumerate all of the saved tensors, organized like this:
 		# tensors = {
 		#	'layer_1_name' : {
-		#		'weight_1_name'  : '/path/to/file',
-		#		...,
+		#		'bias_1_name'  : '/path/to/file',
+		#		'kernel_1_name' : 'path to file'
 		#	},
+		#   'layer_2_name' : {
+		# 	 ...
+		#   }
 		#	...
 		# }
+
+		# Enumerates saved tensors (weights), see above
 		tensors = self.enumerate_saved_tensors(path)
 
 		# We want to put (symbolic_weights, weight_values) tuples in this.
@@ -437,18 +445,20 @@ class KerasBackend(Backend):
 		for layer_name, weights in tensors.items():
 
 			# Load the weights.
-			# This maps weight names to numpy arrays.
+			# This maps weight names (kernel and bias) to numpy arrays into a dict
 			weights = {k : idx.load(v) for k, v in weights.items()}
+			set_trace()
 
-			# Now assign all of the weights to their corresponding symbolic
-			# weights. Loop over all layers which use this name.
+			# get each keras layer object
 			for layer in index.get(layer_name, []):
 
-				# Get the symbolic weights.
+				# Get the symbolic weights:
+				# keras layer object has attribute weights: contains 2 Variables (kernel and bias)
+				# but we don't know which Variable is which
 				symbolic_weights = layer.weights
 
-				# Get the associated names (so we know what order to assign the
-				# weights in.
+				# Get the associated names (so we know what order to assign the weights in.
+				# weight_names is a list of names with order
 				weight_names, _ = \
 					self._get_weight_names_and_values_from_symbolic(
 						symbolic_weights
@@ -469,9 +479,12 @@ class KerasBackend(Backend):
 
 				for i, name in enumerate(weight_names):
 					name = name.replace('/', '_')
+					# weight_value_tuples: a list of tuples, each tuple (Variable tensor, numpy.array)
 					weight_value_tuples.append((symbolic_weights[i], weights[name]))
 
 		# Assign all the weights in one batch (for efficiency).
+		# Sets the values of many tensor variables at once.(set new values to model weights variables)
+		# tuples: a list of tuples `(tensor, value)`, `value` should be a Numpy array
 		K.batch_set_value(weight_value_tuples)
 
 	###########################################################################
@@ -568,18 +581,27 @@ class KerasBackend(Backend):
 		return loss_inputs, loss_outputs, total_loss
 
 	###########################################################################
+	# Create a keras model instance from kur model object
+	# keras model is saved in model.compiled['raw']
+	# func to build keras model graph, inputs, outputs tensors, loss tensors, optimizer tensors are stored inside model.compiled['train']
 	def compile(self, model, loss=None, optimizer=None, blocking=True,
 		assemble_only=False):
 		""" Returns the Keras model instance.
 		"""
+		# create a dict container for 'raw' and 'train'
 		if model.compiled is None:
 			model.compiled = {}
 
+		# if model.compiled['raw'] is not available, create it
 		if 'raw' not in model.compiled:
 			logger.trace('Instantiating a Keras model.')
-			# compiled is keras.engine.training.Model object or model.compiled['raw']
+
+			# model.compiled['raw'] is created as a keras model object given inputs, outputs, loss tensors
+			# lots of useful info stored inside keras model
 			compiled = self.make_model(
+				# get a list of input tensor
 				inputs=[node.value for node in model.inputs.values()],
+				# get a list of selected output tensors (boxes) plus loss tensor
 				outputs=[node.value for node in model.outputs.values()]
 			)
 
@@ -601,18 +623,21 @@ class KerasBackend(Backend):
 				for line in x.getvalue().split('\n'):
 					logger.debug(line)
 
+			# Allows a model to run on multiple GPUs.
 			if self.parallel > 1:
 				from ..utils.parallelism import make_parallel
 				compiled = make_parallel(compiled, self.parallel)
 
 			model.compiled['raw'] = compiled
 
+		# use an existing keras model as model.compiled['raw'] from previous model import
 		else:
 			logger.trace('Reusing an existing model.')
 			compiled = model.compiled['raw']
 
 		logger.debug('Constructing the underlying model.')
 
+		# make use of keras.backend
 		import keras.backend as K				# pylint: disable=import-error
 		if loss is None and optimizer is None:
 			logger.trace('Assembling an evaluation function from the model.')
@@ -647,14 +672,22 @@ class KerasBackend(Backend):
 
 			# Loss inputs: additional inputs needed by the loss function.
 			# Loss outputs: output of the loss function
+			# return inputs tensors for calculating loss, and also return loss_outputs tensor and total_loss tensor, using kur model and kur loss objects
 			loss_inputs, loss_outputs, total_loss = \
 				self.process_loss(model, loss)
 
+			# Returns a backend-specific instantiation of the optimizer.
+			# then run the optimizer given args: 1. trainable_weights (a list of tf.Variables 6) and total_loss tensor.
+			# return updates: a list of tensors (weights of each layer), but why 19 of them???
 			updates = optimizer.get_optimizer(self)(
 				compiled.trainable_weights, total_loss
 			)
 
 			if not assemble_only:
+				# take 3 arguments lists
+				# list1: inputs (images), inputs for loss (labels), learning_phase tensor
+				# list2: selected layer outputs, logits(softmax), mean_of_logits,
+				# list3: updates
 				func = K.function(
 					compiled.inputs + \
 						list(loss_inputs.values()) + \
@@ -663,16 +696,26 @@ class KerasBackend(Backend):
 						list(loss_outputs.values()),
 					updates=updates
 				)
+				# func(): keras.backend.tensorflow_backend.Function object or theano function
+				# Runs a computation graph !!!!!!!
+				# Arguments\n'
+					# inputs: Feed placeholders to the computation graph
+					# outputs: Output tensors to fetch
+					# updates: Additional update ops to be run at function call
+					# name: a name to help users identify what this function does
 			key = 'train'
 
 		logger.trace('Additional inputs for log functions: %s',
 			', '.join(loss_inputs.keys()))
 
+		# get a list of input_names: input for model (images) and inputs for loss (labels)
 		input_names = compiled.input_names + \
 			list(loss_inputs.keys())
+		# get a list of output_names: output_names of all selected layers and output for loss
 		output_names = compiled.output_names + \
 			list(loss_outputs.keys())
 
+		# get list of input_shapes: model input shape, and loss input shape
 		input_shapes = [
 			layer._keras_shape
 			for layer in compiled.inputs
@@ -704,45 +747,58 @@ class KerasBackend(Backend):
 		if logger.isEnabledFor(logging.TRACE):
 			logger.trace('Compiled model: %s', result)
 
+		# model.compiled['train'|'test'|'evaluate'] is a dict to contain func, names for inputs and outputs, shapes, optimizer
 		if not assemble_only:
 			model.compiled[key] = result
 			if blocking:
+				# Waits for the model to finish compiling.
 				self.wait_for_compile(model, key)
 
 		return result
 
 	###########################################################################
 	def wait_for_compile(self, model, key):
-		""" Waits for the model to finish compiling.
+		""" Waits for the model to finish compiling.1. create minimum sample data; 2. save model weights into a temporal folder; 3. test model graph with the sample data; 4. restore model from the temporal folder
 		"""
 		if model.provider is None:
 			logger.warning('No data provider available, so we cannot reliably '
 				'wait for compiling to finish.')
 			return
 
+		# get provider without logging information
 		with DisableLogging():
+			# only take 1 batch, batch_size: 2
 			provider = BatchProvider(
 				sources=dict(zip(model.provider.keys, model.provider.sources)),
 				batch_size=2*max(1, self.parallel),
 				num_batches=1,
 				randomize=False
 			)
+
+		# add another provider to kur model object
 		model.supplement_provider(provider)
 
+		# create empty folder to save weights
 		weight_path = None
 		tempdir = tempfile.mkdtemp()
 		try:
 			weight_path = os.path.join(tempdir, 'weights')
+			# Saves a native Keras model to the prepared folder
+			# it can be a just initialized keras model or a previously trained keras model
 			self._save_keras(model.compiled['raw'], weight_path)
 
 			logger.info('Waiting for model to finish compiling...')
+
+			# run_batch on the sample data above to test the graph built with K.function stored inside model.compiled['train']
 			for batch in provider:
 				self.run_batch(model, batch, key, False)
 			logger.info('Model is ready for use.')
 
 		finally:
+			# once compile test is finished, restore model weights from the saved folder back inot model.compiled['raw']
 			if weight_path and os.path.isdir(weight_path):
 				try:
+					# dive to see how exactly load weights into model.compiled['raw']???
 					self._restore_keras(model.compiled['raw'], weight_path)
 				except:
 					logger.error('We were waiting for the model to finish '
@@ -782,8 +838,8 @@ class KerasBackend(Backend):
 				compiled['names']['input']
 			)
 		] + [is_train]
-		# use model.compiled['train']['func'] with inputs to get predictions and loss
-		# in keras (tf and th) all layers together as a model is used at once, not use layer individually
+
+		# compiled['func'] provide a keras model graph built with given inputs, the output is all selected layer outputs and loss
 		outputs = compiled['func'](inputs)
 		num_outputs = len(raw.outputs)
 		metrics = {
